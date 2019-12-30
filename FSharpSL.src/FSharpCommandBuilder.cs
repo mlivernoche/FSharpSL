@@ -5,9 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace FSharpSE
+namespace FSharpSL
 {
-    public sealed class FSharpCompilerOptionsBuilder : IEnumerable<string>
+    internal sealed class FSharpCompilerOptionsBuilder : IEnumerable<string>
     {
         private List<string> Commands { get; } = new List<string>();
         private HashSet<string> Uniques { get; } = new HashSet<string>();

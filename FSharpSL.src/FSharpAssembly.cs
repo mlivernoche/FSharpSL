@@ -4,14 +4,14 @@ using Microsoft.FSharp.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FSharpSE
+namespace FSharpSL
 {
-    public sealed class FSharpAssembly
+    internal sealed class FSharpAssembly
     {
         private static readonly FSharpChecker DefaultChecker = FSharpChecker.Create(default, default, default, default, default, default);
 

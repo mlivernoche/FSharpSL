@@ -4,9 +4,9 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FSharpSE
+namespace FSharpSL
 {
-    public static class FSharpLoader
+    internal static class FSharpLoader
     {
         public static FSharpAssembly Load(FSharpCompilerOptionsBuilder builder)
         {

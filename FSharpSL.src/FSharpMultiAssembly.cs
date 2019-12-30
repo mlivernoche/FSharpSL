@@ -5,9 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace FSharpSE
+namespace FSharpSL
 {
-    public sealed class FSharpMultiAssembly
+    internal sealed class FSharpMultiAssembly
     {
         private readonly Dictionary<string, FSharpAssembly> Assemblies = new Dictionary<string, FSharpAssembly>();
 

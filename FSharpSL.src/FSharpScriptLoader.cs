@@ -1,9 +1,9 @@
 ﻿using System.IO;
 using System.Threading.Tasks;
 
-namespace FSharpSE
+namespace FSharpSL
 {
-    public class FSharpScriptLoader
+    internal class FSharpScriptLoader
     {
         public virtual byte[] Load(string filePath)
         {

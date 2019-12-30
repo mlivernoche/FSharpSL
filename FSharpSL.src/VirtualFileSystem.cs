@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 
-namespace FSharpSE
+namespace FSharpSL
 {
     internal sealed class VirtualFileSystem : Library.Shim.IFileSystem, IDisposable
     {
