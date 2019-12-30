@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FSharp.Compiler.Service" Version="33.0.1" />
+  </ItemGroup>
+
+  <Import Project="..\FSharpSL.src\FSharpSL.src.projitems" Label="Shared" />
+
+</Project>
