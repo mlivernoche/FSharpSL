@@ -11,6 +11,7 @@ namespace FSharpSL
     {
         private List<string> Commands { get; } = new List<string>();
         private HashSet<string> Uniques { get; } = new HashSet<string>();
+        private HashSet<string> References { get; } = new HashSet<string>();
         public string FileName { get; }
 
         public FSharpCompilerOptionsBuilder(string fileName)
@@ -19,8 +20,6 @@ namespace FSharpSL
             Add("fsc.exe");
             Add("-a");
             Add(fileName);
-            Add("-O");
-            Add("--target:library");
         }
 
         public void Add(string command)
@@ -28,8 +27,20 @@ namespace FSharpSL
             if(Uniques.Add(command))
             {
                 Commands.Add(command);
+
+                var span = command.AsSpan();
+                if(span.StartsWith("-r:"))
+                {
+                    References.Add(span.TrimStart("-r:").ToString());
+                }
+                else if(span.StartsWith("--reference:"))
+                {
+                    References.Add(span.TrimStart("--reference:").ToString());
+                }
             }
         }
+
+        public IEnumerable<string> GetReferences() => References;
 
         public string[] ToArray()
         {

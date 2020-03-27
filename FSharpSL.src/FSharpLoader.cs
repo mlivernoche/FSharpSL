@@ -1,75 +1,78 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FSharpSL
 {
-    internal static class FSharpLoader
+    internal static class FSharpAssemblyBuilder
     {
-        public static FSharpAssembly Load(FSharpCompilerOptionsBuilder builder)
+        public static FSharpAssembly Build(FSharpCompilerOptionsBuilder optionsBuilder)
         {
-            using var vfs = new VirtualFileSystem();
-            vfs.AddFile(builder.FileName, File.ReadAllBytes(builder.FileName));
-            return new FSharpAssembly(builder);
+            using var vfs = new VirtualFileSystem(optionsBuilder.GetReferences());
+            vfs.AddFile(optionsBuilder.FileName, File.ReadAllBytes(optionsBuilder.FileName));
+            return new FSharpAssembly(optionsBuilder);
         }
 
-        public static async Task<FSharpAssembly> LoadAsync(FSharpCompilerOptionsBuilder builder)
+        public static async Task<FSharpAssembly> BuildAsync(FSharpCompilerOptionsBuilder optionsBuilder, CancellationToken token)
         {
-            using var vfs = new VirtualFileSystem();
-            vfs.AddFile(builder.FileName, await File.ReadAllBytesAsync(builder.FileName).ConfigureAwait(false));
-            return await FSharpAssembly.CreateAsync(builder).ConfigureAwait(false);
+            using var vfs = new VirtualFileSystem(optionsBuilder.GetReferences());
+            vfs.AddFile(optionsBuilder.FileName, await File.ReadAllBytesAsync(optionsBuilder.FileName, token).ConfigureAwait(false));
+            return await FSharpAssembly.CreateAsync(optionsBuilder, token).ConfigureAwait(false);
         }
 
-        public static FSharpAssembly Load(FSharpCompilerOptionsBuilder builder, FSharpScriptLoader loader)
+        public static async Task<FSharpAssembly> BuildAsync(FSharpCompilerOptionsBuilder optionsBuilder)
         {
-            using var vfs = new VirtualFileSystem();
-            vfs.AddFile(builder.FileName, loader.Load(builder.FileName));
-            return new FSharpAssembly(builder);
+            return await BuildAsync(optionsBuilder, CancellationToken.None);
         }
 
-        public static async Task<FSharpAssembly> LoadAsync(FSharpCompilerOptionsBuilder builder, FSharpScriptLoader loader)
+        public static FSharpAssembly Build(FSharpCompilerOptionsBuilder optionsBuilder, FSharpScriptLoader loader)
         {
-            using var vfs = new VirtualFileSystem();
-            vfs.AddFile(builder.FileName, await loader.LoadAsync(builder.FileName).ConfigureAwait(false));
-            return await FSharpAssembly.CreateAsync(builder).ConfigureAwait(false);
+            using var vfs = new VirtualFileSystem(optionsBuilder.GetReferences());
+            vfs.AddFile(optionsBuilder.FileName, loader.Load(optionsBuilder.FileName));
+            var asm = new FSharpAssembly(optionsBuilder);
+            loader.ValidateAssembly(asm);
+            return asm;
         }
 
-        public static FSharpAssembly Load(FSharpCompilerOptionsBuilder builder, FSharpScriptLoader loader, IEnumerable<string> references)
+        public static async Task<FSharpAssembly> BuildAsync(FSharpCompilerOptionsBuilder optionsBuilder, FSharpScriptLoader loader, CancellationToken token)
         {
-            using var vfs = new VirtualFileSystem(references);
-            vfs.AddFile(builder.FileName, loader.Load(builder.FileName));
-            return new FSharpAssembly(builder);
+            using var vfs = new VirtualFileSystem(optionsBuilder.GetReferences());
+            vfs.AddFile(optionsBuilder.FileName, await loader.LoadAsync(optionsBuilder.FileName, token).ConfigureAwait(false));
+            var asm = await FSharpAssembly.CreateAsync(optionsBuilder, token).ConfigureAwait(false);
+            loader.ValidateAssembly(asm);
+            return asm;
         }
 
-        public static async Task<FSharpAssembly> LoadAsync(FSharpCompilerOptionsBuilder builder, FSharpScriptLoader loader, IEnumerable<string> references)
+        public static async Task<FSharpAssembly> BuildAsync(FSharpCompilerOptionsBuilder optionsBuilder, FSharpScriptLoader loader)
         {
-            using var vfs = new VirtualFileSystem(references);
-            vfs.AddFile(builder.FileName, await loader.LoadAsync(builder.FileName).ConfigureAwait(false));
-            return await FSharpAssembly.CreateAsync(builder).ConfigureAwait(false);
+            return await BuildAsync(optionsBuilder, loader, CancellationToken.None);
         }
 
-        public static FSharpMultiAssembly Load(IEnumerable<FSharpCompilerOptionsBuilder> builders)
+        public static FSharpMultiAssembly Build(IEnumerable<FSharpCompilerOptionsBuilder> optionBuilders)
         {
-            using var vfs = new VirtualFileSystem();
+            using var vfs = new VirtualFileSystem(optionBuilders.SelectMany(builder => builder.GetReferences()).ToHashSet());
 
-            foreach (var builder in builders)
+            foreach (var builder in optionBuilders)
             {
                 vfs.AddFile(builder.FileName, File.ReadAllBytes(builder.FileName));
             }
 
-            return new FSharpMultiAssembly(builders);
+            return new FSharpMultiAssembly(optionBuilders);
         }
 
-        public static async Task<FSharpMultiAssembly> LoadAsync(IEnumerable<FSharpCompilerOptionsBuilder> builders)
+        public static async Task<FSharpMultiAssembly> BuildAsync(IEnumerable<FSharpCompilerOptionsBuilder> optionBuilders, CancellationToken token)
         {
-            using var vfs = new VirtualFileSystem();
+            using var vfs = new VirtualFileSystem(optionBuilders.SelectMany(builder => builder.GetReferences()).ToHashSet());
             var fileMap = new Dictionary<string, Task<byte[]>>();
 
-            foreach (var build in builders)
+            foreach (var build in optionBuilders)
             {
-                fileMap.Add(build.FileName, File.ReadAllBytesAsync(build.FileName));
+                fileMap.Add(build.FileName, File.ReadAllBytesAsync(build.FileName, token));
             }
 
             await Task.WhenAll(fileMap.Values).ConfigureAwait(false);
@@ -79,29 +82,36 @@ namespace FSharpSL
                 vfs.AddFile(file.Key, await file.Value.ConfigureAwait(false));
             }
 
-            return await FSharpMultiAssembly.CreateAsync(builders).ConfigureAwait(false);
+            return await FSharpMultiAssembly.CreateAsync(optionBuilders, token).ConfigureAwait(false);
         }
 
-        public static FSharpMultiAssembly Load(IEnumerable<FSharpCompilerOptionsBuilder> builders, FSharpScriptLoader loader)
+        public static async Task<FSharpMultiAssembly> BuildAsync(IEnumerable<FSharpCompilerOptionsBuilder> optionBuilders)
         {
-            using var vfs = new VirtualFileSystem();
+            return await BuildAsync(optionBuilders, CancellationToken.None);
+        }
 
-            foreach (var builder in builders)
+        public static FSharpMultiAssembly Build(IEnumerable<FSharpCompilerOptionsBuilder> optionBuilders, FSharpScriptLoader loader)
+        {
+            using var vfs = new VirtualFileSystem(optionBuilders.SelectMany(builder => builder.GetReferences()).ToHashSet());
+
+            foreach (var builder in optionBuilders)
             {
                 vfs.AddFile(builder.FileName, loader.Load(builder.FileName));
             }
 
-            return new FSharpMultiAssembly(builders);
+            var asm = new FSharpMultiAssembly(optionBuilders);
+            loader.ValidateAssemblies(asm);
+            return asm;
         }
 
-        public static async Task<FSharpMultiAssembly> LoadAsync(IEnumerable<FSharpCompilerOptionsBuilder> builders, FSharpScriptLoader loader)
+        public static async Task<FSharpMultiAssembly> BuildAsync(IEnumerable<FSharpCompilerOptionsBuilder> optionBuilders, FSharpScriptLoader loader, CancellationToken token)
         {
-            using var vfs = new VirtualFileSystem();
+            using var vfs = new VirtualFileSystem(optionBuilders.SelectMany(builder => builder.GetReferences()).ToHashSet());
             var fileMap = new Dictionary<string, Task<byte[]>>();
 
-            foreach (var builder in builders)
+            foreach (var builder in optionBuilders)
             {
-                fileMap.Add(builder.FileName, loader.LoadAsync(builder.FileName));
+                fileMap.Add(builder.FileName, loader.LoadAsync(builder.FileName, token));
             }
 
             await Task.WhenAll(fileMap.Values).ConfigureAwait(false);
@@ -111,7 +121,14 @@ namespace FSharpSL
                 vfs.AddFile(path.Key, await path.Value.ConfigureAwait(false));
             }
 
-            return await FSharpMultiAssembly.CreateAsync(builders).ConfigureAwait(false);
+            var asm = await FSharpMultiAssembly.CreateAsync(optionBuilders, token).ConfigureAwait(false);
+            loader.ValidateAssemblies(asm);
+            return asm;
+        }
+
+        public static async Task<FSharpMultiAssembly> BuildAsync(IEnumerable<FSharpCompilerOptionsBuilder> optionBuilders, FSharpScriptLoader loader)
+        {
+            return await BuildAsync(optionBuilders, CancellationToken.None);
         }
     }
 }

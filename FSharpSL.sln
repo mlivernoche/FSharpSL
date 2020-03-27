@@ -9,6 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FSharpSL.build", "FSharpSL.
 EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		FSharpSL.src\FSharpSL.src.projitems*{3143a265-d373-41dd-8302-08e1da667008}*SharedItemsImports = 5
 		FSharpSL.src\FSharpSL.src.projitems*{95bc3306-b629-450f-9de8-40eb50db95b5}*SharedItemsImports = 13
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

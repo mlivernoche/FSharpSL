@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FSharpSL
@@ -60,13 +61,13 @@ namespace FSharpSL
             return newasm;
         }
 
-        public static async Task<FSharpMultiAssembly> CreateAsync(IEnumerable<FSharpCompilerOptionsBuilder> builders)
+        public static async Task<FSharpMultiAssembly> CreateAsync(IEnumerable<FSharpCompilerOptionsBuilder> builders, CancellationToken token)
         {
             var tasks = new Dictionary<string, Task<FSharpAssembly>>();
 
             foreach (var builder in builders)
             {
-                tasks.Add(builder.FileName, FSharpAssembly.CreateAsync(builder));
+                tasks.Add(builder.FileName, FSharpAssembly.CreateAsync(builder, token));
             }
 
             await Task.WhenAll(tasks.Values).ConfigureAwait(false);
@@ -79,6 +80,11 @@ namespace FSharpSL
             }
 
             return new FSharpMultiAssembly(finishedAssemblies);
+        }
+
+        public static async Task<FSharpMultiAssembly> CreateAsync(IEnumerable<FSharpCompilerOptionsBuilder> builders)
+        {
+            return await CreateAsync(builders, CancellationToken.None);
         }
 
         public static FSharpMultiAssembly CreateFromDirectory(string directory)

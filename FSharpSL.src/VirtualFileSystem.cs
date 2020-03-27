@@ -1,6 +1,8 @@
 ﻿using FSharp.Compiler.AbstractIL.Internal;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 
@@ -15,19 +17,15 @@ namespace FSharpSL
 
         private static readonly object FileSystemLock = new object();
         private static readonly Library.Shim.IFileSystem Default = new Library.Shim.DefaultFileSystem();
-        private static readonly HashSet<string> RequiredAssemblies = new HashSet<string>
-        {
-            "mscorlib.dll",
-            "System.Private.CoreLib.dll",
-            "System.Runtime.dll",
-            "System.Runtime.Extensions.dll",
-            "FSharp.Core.dll",
-            "System.Globalization.dll",
-            "System.Collections.dll"
-        };
 
         private HashSet<string> ReferencePaths { get; } = new HashSet<string>();
         private Dictionary<string, byte[]> AllowedFiles { get; } = new Dictionary<string, byte[]>();
+        private static Dictionary<string, string> ExplicitReferencePaths { get; } = new Dictionary<string, string>();
+        private static Dictionary<string, string> ImplicitReferencePaths { get; } = new Dictionary<string, string>();
+
+        public static IReadOnlyDictionary<string, string> GetExplicitlyLoadedReferences() => new ReadOnlyDictionary<string, string>(ExplicitReferencePaths);
+
+        public static IReadOnlyDictionary<string, string> GetImplicitlyLoadedReferences() => new ReadOnlyDictionary<string, string>(ImplicitReferencePaths);
 
         internal VirtualFileSystem()
         {
@@ -54,40 +52,12 @@ namespace FSharpSL
 
         public Assembly AssemblyLoad(AssemblyName assemblyName)
         {
-            if (RequiredAssemblies.Contains(assemblyName.Name + ".dll"))
-            {
-                var asm = Default.AssemblyLoad(assemblyName);
-
-                if (Path.GetDirectoryName(asm.Location) != Environment.CurrentDirectory)
-                {
-                    throw new NotSupportedException();
-                }
-
-                return asm;
-            }
-            else
-            {
-                foreach (var asm in ReferencePaths)
-                {
-                    var asmName = AssemblyName.GetAssemblyName(asm);
-                    if (asmName.FullName == assemblyName.FullName)
-                    {
-                        return Default.AssemblyLoad(asmName);
-                    }
-                }
-            }
-
-            throw new NotSupportedException();
+            return Default.AssemblyLoad(assemblyName);
         }
 
         public Assembly AssemblyLoadFrom(string fileName)
         {
-            if (ReferencePaths.Contains(fileName))
-            {
-                return Default.AssemblyLoadFrom(fileName);
-            }
-
-            throw new NotSupportedException();
+            return Default.AssemblyLoadFrom(fileName);
         }
 
         public void FileDelete(string fileName)
@@ -102,31 +72,39 @@ namespace FSharpSL
 
         public Stream FileStreamReadShim(string fileName)
         {
-            if (RequiredAssemblies.Contains(Path.GetFileName(fileName)))
-            {
-                if (Path.GetDirectoryName(fileName) != Environment.CurrentDirectory)
-                {
-                    throw new NotSupportedException();
-                }
-                else if (!File.Exists(fileName))
-                {
-                    throw new FileNotFoundException();
-                }
-
-                return Default.FileStreamReadShim(fileName);
-            }
-            else if (AllowedFiles.TryGetValue(fileName, out var bytes))
+            if (AllowedFiles.TryGetValue(fileName, out var bytes))
             {
                 return new MemoryStream(bytes);
             }
-            else if (ReferencePaths.Contains(fileName))
+
+            if (!File.Exists(fileName))
             {
-                if (!File.Exists(fileName))
+                throw new FileNotFoundException();
+            }
+
+            // if this is an assembly, AssemblyName.GetAssemblyName will work.
+            try
+            {
+                var name = AssemblyName.GetAssemblyName(fileName);
+                var assemblyMap = ReferencePaths.Contains(fileName) ? ExplicitReferencePaths : ImplicitReferencePaths;
+
+                if (assemblyMap.TryGetValue(name.FullName, out var path))
                 {
-                    throw new FileNotFoundException();
+                    if (path != fileName)
+                    {
+                        throw new NotSupportedException("Trying to load the same assembly from different locations.");
+                    }
+                }
+                else
+                {
+                    assemblyMap.Add(name.FullName, fileName);
                 }
 
                 return Default.FileStreamReadShim(fileName);
+            }
+            catch (BadImageFormatException)
+            {
+                throw new NotSupportedException("Cannot load a non-assembly file.");
             }
 
             throw new NotSupportedException();
@@ -169,6 +147,15 @@ namespace FSharpSL
 
         public byte[] ReadAllBytesShim(string fileName)
         {
+            if (AllowedFiles.TryGetValue(fileName, out var bytes) && bytes != null)
+            {
+                return bytes;
+            }
+            else if (ReferencePaths.Contains(fileName))
+            {
+                return Default.ReadAllBytesShim(fileName);
+            }
+
             throw new NotSupportedException();
         }
 

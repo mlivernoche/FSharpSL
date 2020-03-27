@@ -3,10 +3,12 @@ using Microsoft.FSharp.Control;
 using Microsoft.FSharp.Core;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FSharpSL
@@ -19,6 +21,7 @@ namespace FSharpSL
 
         public string AssemblyFullName { get; }
         public string AssemblyName { get; }
+        public AssemblyName[] GetReferencedAssemblies() => _assembly.GetReferencedAssemblies();
 
         private FSharpAssembly(Assembly asm)
         {
@@ -58,28 +61,47 @@ namespace FSharpSL
         {
         }
 
+        internal static async Task<FSharpAssembly> CreateAsync(FSharpCompilerOptionsBuilder builder, FSharpChecker checker, CancellationToken token)
+        {
+            try
+            {
+                var args = builder.ToArray();
+
+                var task = checker.CompileToDynamicAssembly(
+                    args,
+                    FSharpOption<Tuple<TextWriter, TextWriter>>.None,
+                    FSharpOption<string>.None);
+
+                var result = await FSharpAsync.StartAsTask(task, default, token).ConfigureAwait(false);
+
+                if (result.Item3 == null)
+                {
+                    ThrowErrorMessages(builder.FileName, result.Item1);
+                }
+
+                return new FSharpAssembly(result.Item3.Value);
+            }
+            catch(TaskCanceledException ex)
+            {
+                // Workaround for https://github.com/dotnet/fsharp/issues/3219
+                // ex.CancellationToken is not the same as token, for some reason.
+                throw new TaskCanceledException(ex.Message, ex, token);
+            }
+        }
+
         internal static async Task<FSharpAssembly> CreateAsync(FSharpCompilerOptionsBuilder builder, FSharpChecker checker)
         {
-            var args = builder.ToArray();
+            return await CreateAsync(builder, checker, CancellationToken.None);
+        }
 
-            var task = checker.CompileToDynamicAssembly(
-                args,
-                FSharpOption<Tuple<TextWriter, TextWriter>>.None,
-                FSharpOption<string>.None);
-
-            var result = await FSharpAsync.StartAsTask(task, default, default).ConfigureAwait(false);
-
-            if (result.Item3 == null)
-            {
-                ThrowErrorMessages(builder.FileName, result.Item1);
-            }
-
-            return new FSharpAssembly(result.Item3.Value);
+        internal static async Task<FSharpAssembly> CreateAsync(FSharpCompilerOptionsBuilder builder, CancellationToken token)
+        {
+            return await CreateAsync(builder, DefaultChecker, token).ConfigureAwait(false);
         }
 
         internal static async Task<FSharpAssembly> CreateAsync(FSharpCompilerOptionsBuilder builder)
         {
-            return await CreateAsync(builder, DefaultChecker).ConfigureAwait(false);
+            return await CreateAsync(builder, CancellationToken.None).ConfigureAwait(false);
         }
 
         private static void ThrowErrorMessages(string path, IEnumerable<FSharpErrorInfo> errors)
@@ -132,6 +154,8 @@ namespace FSharpSL
                 error.AppendLine(msg);
             }
 
+            error.AppendLine(new string('+', 50));
+
             var e = new Exception(error.ToString());
 
             foreach (var err in errors)
@@ -139,7 +163,6 @@ namespace FSharpSL
                 e.Data.Add(Guid.NewGuid().ToString(), err.Message);
             }
 
-            error.AppendLine(new string('+', 50));
             throw e;
         }
 
