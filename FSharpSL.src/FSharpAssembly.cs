@@ -1,9 +1,11 @@
-﻿using FSharp.Compiler.SourceCodeServices;
+﻿using FSharp.Compiler.AbstractIL.Internal;
+using FSharp.Compiler.SourceCodeServices;
 using Microsoft.FSharp.Control;
 using Microsoft.FSharp.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -15,7 +17,7 @@ namespace FSharpSL
 {
     internal sealed class FSharpAssembly
     {
-        private static readonly FSharpChecker DefaultChecker = FSharpChecker.Create(default, default, default, default, default, default);
+        private static readonly FSharpChecker DefaultChecker = FSharpChecker.Create(default, default, default, default, default, default, default, default);
 
         private readonly Assembly _assembly;
 
@@ -91,7 +93,7 @@ namespace FSharpSL
 
         internal static async Task<FSharpAssembly> CreateAsync(FSharpCompilerOptionsBuilder builder, FSharpChecker checker)
         {
-            return await CreateAsync(builder, checker, CancellationToken.None);
+            return await CreateAsync(builder, checker, CancellationToken.None).ConfigureAwait(false);
         }
 
         internal static async Task<FSharpAssembly> CreateAsync(FSharpCompilerOptionsBuilder builder, CancellationToken token)
@@ -120,8 +122,8 @@ namespace FSharpSL
             }
 
             error.AppendLine();
-            error.AppendLine($"Number of Errors: {numberOfErrors.ToString("N0")}");
-            error.AppendLine($"Number of warnings: {numberOfWarnings.ToString("N0")}");
+            error.AppendLine($"Number of Errors: {numberOfErrors.ToString("N0", CultureInfo.InvariantCulture)}");
+            error.AppendLine($"Number of warnings: {numberOfWarnings.ToString("N0", CultureInfo.InvariantCulture)}");
 
             var errorMessages = new List<string>();
             var warningMessages = new List<string>();
@@ -130,16 +132,16 @@ namespace FSharpSL
             {
                 if (err.Severity.IsError)
                 {
-                    errorMessages.Add($"Error #{err.ErrorNumber.ToString()}, Line #{err.StartLineAlternate.ToString()}: {err.Message}");
+                    errorMessages.Add($"Error #{err.ErrorNumber.ToString(CultureInfo.InvariantCulture)}, Line #{err.Range.StartLine.ToString(CultureInfo.InvariantCulture)}: {err.Message}");
                 }
                 else if (err.Severity.IsWarning)
                 {
-                    warningMessages.Add($"Warning #{err.ErrorNumber.ToString()}, Line #{err.StartLineAlternate.ToString()}: {err.Message}");
+                    warningMessages.Add($"Warning #{err.ErrorNumber.ToString(CultureInfo.InvariantCulture)}, Line #{err.Range.StartLine.ToString(CultureInfo.InvariantCulture)}: {err.Message}");
                 }
             }
 
             error.AppendLine();
-            error.AppendLine($"========== ERRORS: {numberOfErrors.ToString("N0")} ==========");
+            error.AppendLine($"========== ERRORS: {numberOfErrors.ToString("N0", CultureInfo.InvariantCulture)} ==========");
 
             foreach (var msg in errorMessages)
             {
@@ -147,7 +149,7 @@ namespace FSharpSL
             }
 
             error.AppendLine();
-            error.AppendLine($"========== WARNINGS: {numberOfWarnings.ToString("N0")} ==========");
+            error.AppendLine($"========== WARNINGS: {numberOfWarnings.ToString("N0", CultureInfo.InvariantCulture)} ==========");
 
             foreach (var msg in warningMessages)
             {
@@ -166,21 +168,45 @@ namespace FSharpSL
             throw e;
         }
 
-        public IEnumerable<MethodInfo> GetMethods()
-        {
-            var t = _assembly.GetType(AssemblyName, false, true);
-            return t.GetMethods();
-        }
-
         private MethodInfo GetMethod(string methodName)
         {
             var t = _assembly.GetType(AssemblyName, false, true);
 
+            if(t == null)
+            {
+                throw new TypeLoadException($"{AssemblyName} assembly not found.");
+            }
+
             var method = t.GetMethod(methodName);
+
+            if(method == null)
+            {
+                throw new TypeLoadException($"{methodName} method not found.");
+            }
 
             if (!method.IsStatic)
             {
-                throw new InvalidOperationException("Cannot create a delegate instance of a non-static method.");
+                throw new InvalidOperationException($"{AssemblyName}, {methodName}: cannot create a delegate instance of a non-static method (MethodBase.IsStatic={method.IsStatic.ToString()}).");
+            }
+
+            if(method.IsSpecialName)
+            {
+                throw new InvalidOperationException($"{AssemblyName}, {methodName}: cannot use a method with a special name (MethodBase.IsSpecialName={method.IsSpecialName.ToString()}).");
+            }
+
+            if(method.IsPrivate)
+            {
+                throw new InvalidOperationException($"{AssemblyName}, {methodName}: cannot use a private method (MethodBase.IsPrivate={method.IsPrivate.ToString()}).");
+            }
+
+            if (method.IsAbstract)
+            {
+                throw new InvalidOperationException($"{AssemblyName}, {methodName}: cannot use an abstract method with no implementation (MethodBase.IsAbstract={method.IsAbstract.ToString()}).");
+            }
+
+            if (method.IsConstructor)
+            {
+                throw new InvalidOperationException($"{AssemblyName}, {methodName}: cannot use a constructor (MethodBase.IsConstructor={method.IsConstructor.ToString()}).");
             }
 
             return method;
@@ -188,9 +214,17 @@ namespace FSharpSL
 
         public T CreateDelegate<T>(string methodName) where T : Delegate
         {
-            var method = GetMethod(methodName);
-            var del = (T)method.CreateDelegate(typeof(T));
-            return del;
+            try
+            {
+                var method = GetMethod(methodName);
+                var del = (T)method.CreateDelegate(typeof(T));
+                return del;
+            }
+            catch(ArgumentException ex)
+            {
+                ex.Data.Add(Guid.NewGuid().ToString(), $"{AssemblyName}, {methodName}: failed to create method.");
+                throw;
+            }
         }
 
         public Func<TResult> CreateFunction<TResult>(string methodName)

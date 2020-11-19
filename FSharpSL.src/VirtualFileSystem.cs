@@ -4,43 +4,26 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 
 namespace FSharpSL
 {
-    internal sealed class VirtualFileSystem : Library.Shim.IFileSystem, IDisposable
+    internal sealed class VirtualFileSystem : Library.Shim.IFileSystem
     {
-        static VirtualFileSystem()
-        {
-            Library.Shim.FileSystem = Default;
-        }
-
-        private static readonly object FileSystemLock = new object();
         private static readonly Library.Shim.IFileSystem Default = new Library.Shim.DefaultFileSystem();
 
         private HashSet<string> ReferencePaths { get; } = new HashSet<string>();
         private Dictionary<string, byte[]> AllowedFiles { get; } = new Dictionary<string, byte[]>();
-        private static Dictionary<string, string> ExplicitReferencePaths { get; } = new Dictionary<string, string>();
-        private static Dictionary<string, string> ImplicitReferencePaths { get; } = new Dictionary<string, string>();
+        private Dictionary<string, string> ExplicitReferencePaths { get; } = new Dictionary<string, string>();
+        private Dictionary<string, string> ImplicitReferencePaths { get; } = new Dictionary<string, string>();
+        private HashSet<string> LoadedAssemblies { get; } = new();
 
-        public static IReadOnlyDictionary<string, string> GetExplicitlyLoadedReferences() => new ReadOnlyDictionary<string, string>(ExplicitReferencePaths);
+        public IReadOnlyDictionary<string, string> GetExplicitlyLoadedReferences() => new ReadOnlyDictionary<string, string>(ExplicitReferencePaths);
 
-        public static IReadOnlyDictionary<string, string> GetImplicitlyLoadedReferences() => new ReadOnlyDictionary<string, string>(ImplicitReferencePaths);
+        public IReadOnlyDictionary<string, string> GetImplicitlyLoadedReferences() => new ReadOnlyDictionary<string, string>(ImplicitReferencePaths);
 
-        internal VirtualFileSystem()
-        {
-            lock (FileSystemLock)
-            {
-                if (Library.Shim.FileSystem != Default)
-                {
-                    throw new NotSupportedException("Cannot have multiple custom IFileSystem instances.");
-                }
-
-                Library.Shim.FileSystem = this;
-            }
-        }
-
-        internal VirtualFileSystem(IEnumerable<string> references) : this()
+        internal VirtualFileSystem(IEnumerable<string> references)
         {
             ReferencePaths = new HashSet<string>(references);
         }
@@ -52,12 +35,13 @@ namespace FSharpSL
 
         public Assembly AssemblyLoad(AssemblyName assemblyName)
         {
+            LoadedAssemblies.Add(assemblyName.FullName);
             return Default.AssemblyLoad(assemblyName);
         }
 
         public Assembly AssemblyLoadFrom(string fileName)
         {
-            return Default.AssemblyLoadFrom(fileName);
+            throw new NotSupportedException();
         }
 
         public void FileDelete(string fileName)
@@ -162,26 +146,6 @@ namespace FSharpSL
         public bool SafeExists(string fileName)
         {
             return Default.SafeExists(fileName);
-        }
-
-        private bool disposedValue = false;
-
-        void Dispose(bool disposing)
-        {
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    Library.Shim.FileSystem = Default;
-                }
-
-                disposedValue = true;
-            }
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
         }
     }
 }

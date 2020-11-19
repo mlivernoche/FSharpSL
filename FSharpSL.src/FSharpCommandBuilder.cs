@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 
 namespace FSharpSL
@@ -13,10 +14,12 @@ namespace FSharpSL
         private HashSet<string> Uniques { get; } = new HashSet<string>();
         private HashSet<string> References { get; } = new HashSet<string>();
         public string FileName { get; }
+        public string AssemblyName { get; }
 
-        public FSharpCompilerOptionsBuilder(string fileName)
+        public FSharpCompilerOptionsBuilder(string fileName, string assemblyName)
         {
             FileName = fileName;
+            AssemblyName = assemblyName;
             Add("fsc.exe");
             Add("-a");
             Add(fileName);

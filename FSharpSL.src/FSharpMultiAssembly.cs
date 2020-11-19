@@ -25,7 +25,7 @@ namespace FSharpSL
         {
             foreach (var builder in builders)
             {
-                Assemblies.Add(Path.GetFileNameWithoutExtension(builder.FileName), new FSharpAssembly(builder));
+                Assemblies.Add(builder.AssemblyName, new FSharpAssembly(builder));
             }
         }
 
@@ -67,7 +67,7 @@ namespace FSharpSL
 
             foreach (var builder in builders)
             {
-                tasks.Add(builder.FileName, FSharpAssembly.CreateAsync(builder, token));
+                tasks.Add(builder.AssemblyName, FSharpAssembly.CreateAsync(builder, token));
             }
 
             await Task.WhenAll(tasks.Values).ConfigureAwait(false);
@@ -76,7 +76,7 @@ namespace FSharpSL
 
             foreach (var asm in tasks)
             {
-                finishedAssemblies.Add(Path.GetFileNameWithoutExtension(asm.Key), await asm.Value.ConfigureAwait(false));
+                finishedAssemblies.Add(asm.Key, await asm.Value.ConfigureAwait(false));
             }
 
             return new FSharpMultiAssembly(finishedAssemblies);
@@ -89,10 +89,14 @@ namespace FSharpSL
 
         public static FSharpMultiAssembly CreateFromDirectory(string directory)
         {
-            return new FSharpMultiAssembly(
-                Directory
-                .EnumerateFiles(directory, "*.fsx")
-                .Select(file => new FSharpCompilerOptionsBuilder(file)));
+            var builders = new List<FSharpCompilerOptionsBuilder>();
+
+            foreach(var file in Directory.EnumerateFiles(directory, "*.fsx"))
+            {
+                builders.Add(new FSharpCompilerOptionsBuilder(file, file));
+            }
+
+            return new FSharpMultiAssembly(builders);
         }
 
         public T CreateDelegate<T>(string assembly, string method) where T : Delegate
