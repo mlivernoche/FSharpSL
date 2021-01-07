@@ -29,7 +29,7 @@ namespace FSharpSL
         {
             _assembly = asm;
             AssemblyFullName = asm.GetName().FullName;
-            AssemblyName = asm.GetName().Name;
+            AssemblyName = asm.GetName().Name ?? string.Empty;
         }
 
         internal FSharpAssembly(FSharpCompilerOptionsBuilder builder, FSharpChecker checker)
@@ -52,7 +52,7 @@ namespace FSharpSL
 
             _assembly = fsharpAssembly;
             AssemblyFullName = _assembly.GetName().FullName;
-            AssemblyName = _assembly.GetName().Name;
+            AssemblyName = _assembly.GetName().Name ?? string.Empty;
         }
 
         internal FSharpAssembly(FSharpCompilerOptionsBuilder builder) : this(builder, DefaultChecker)
@@ -76,7 +76,7 @@ namespace FSharpSL
 
                 var result = await FSharpAsync.StartAsTask(task, default, token).ConfigureAwait(false);
 
-                if (result.Item3 == null)
+                if (result == null || result.Item3 == null)
                 {
                     ThrowErrorMessages(builder.FileName, result.Item1);
                 }
@@ -85,9 +85,13 @@ namespace FSharpSL
             }
             catch(TaskCanceledException ex)
             {
+#if NETSTANDARD2_0
+                throw;
+#elif NET5_0
                 // Workaround for https://github.com/dotnet/fsharp/issues/3219
                 // ex.CancellationToken is not the same as token, for some reason.
                 throw new TaskCanceledException(ex.Message, ex, token);
+#endif
             }
         }
 

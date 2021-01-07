@@ -20,8 +20,8 @@ namespace FSharpSL
 
         protected FSharpScriptLoader(IEnumerable<FSharpCompilerOptionsBuilder> optionBuilders)
         {
-            CompilerOptions = optionBuilders.ToHashSet();
-            FileSystem = new VirtualFileSystem(CompilerOptions.SelectMany(x => x.GetReferences().ToHashSet()));
+            CompilerOptions = new HashSet<FSharpCompilerOptionsBuilder>(optionBuilders);
+            FileSystem = new VirtualFileSystem(CompilerOptions.SelectMany(static x => new HashSet<string>(x.GetReferences())));
         }
 
         protected void AddFile(string path)
@@ -39,14 +39,16 @@ namespace FSharpSL
             return File.ReadAllBytes(filePath);
         }
 
-        public virtual async Task<byte[]> LoadAsync(string filePath)
+        public virtual async Task<byte[]> LoadAsync(string filePath, CancellationToken token = default)
         {
-            return await File.ReadAllBytesAsync(filePath).ConfigureAwait(false);
-        }
-
-        public virtual async Task<byte[]> LoadAsync(string filePath, CancellationToken token)
-        {
+#if NETSTANDARD2_0
+            using var file = File.OpenRead(filePath);
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms, 81920, token).ConfigureAwait(false);
+            return ms.ToArray();
+#elif NET5_0
             return await File.ReadAllBytesAsync(filePath, token).ConfigureAwait(false);
+#endif
         }
 
         public FSharpMultiAssembly Build()

@@ -32,13 +32,21 @@ namespace FSharpSL
                 Commands.Add(command);
 
                 var span = command.AsSpan();
-                if(span.StartsWith("-r:"))
+#if NETSTANDARD2_0
+                ReadOnlySpan<char> rSpan = "-r:".AsSpan();
+                ReadOnlySpan<char> referenceSpan = "--reference".AsSpan();
+#elif NET5_0
+                var rSpan = "-r:";
+                var referenceSpan = "--reference";
+#endif
+
+                if (span.StartsWith(rSpan))
                 {
-                    References.Add(span.TrimStart("-r:").ToString());
+                    References.Add(span.TrimStart(rSpan).ToString());
                 }
-                else if(span.StartsWith("--reference:"))
+                else if (span.StartsWith(referenceSpan))
                 {
-                    References.Add(span.TrimStart("--reference:").ToString());
+                    References.Add(span.TrimStart(referenceSpan).ToString());
                 }
             }
         }
@@ -52,12 +60,14 @@ namespace FSharpSL
 
         public IEnumerator<string> GetEnumerator()
         {
-            return ((IEnumerable<string>)Commands).GetEnumerator();
+            IEnumerable<string> enumerable = Commands;
+            return enumerable.GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return ((IEnumerable<string>)Commands).GetEnumerator();
+            IEnumerable enumerable = Commands;
+            return enumerable.GetEnumerator();
         }
     }
 }
