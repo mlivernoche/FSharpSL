@@ -1,4 +1,4 @@
-﻿using FSharp.Compiler.AbstractIL.Internal;
+﻿using FSharp.Compiler.SourceCodeServices;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -9,9 +9,9 @@ using System.Reflection;
 
 namespace FSharpSL
 {
-    internal sealed class VirtualFileSystem : Library.Shim.IFileSystem
+    internal sealed class VirtualFileSystem : IFileSystem
     {
-        private static readonly Library.Shim.IFileSystem Default = new Library.Shim.DefaultFileSystem();
+        private static readonly IFileSystem Default = new DefaultFileSystem();
 
         private HashSet<string> ReferencePaths { get; } = new HashSet<string>();
         private Dictionary<string, byte[]> AllowedFiles { get; } = new Dictionary<string, byte[]>();

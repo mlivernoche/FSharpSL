@@ -1,4 +1,4 @@
-﻿using FSharp.Compiler.AbstractIL.Internal;
+﻿using FSharp.Compiler;
 using FSharp.Compiler.SourceCodeServices;
 using Microsoft.FSharp.Control;
 using Microsoft.FSharp.Core;
@@ -17,7 +17,10 @@ namespace FSharpSL
 {
     internal sealed class FSharpAssembly
     {
-        private static readonly FSharpChecker DefaultChecker = FSharpChecker.Create(default, default, default, default, default, default, default, default);
+        private static readonly FSharpChecker DefaultChecker = FSharpChecker.Create(
+            FSharpOption<int>.None, FSharpOption<bool>.None, FSharpOption<bool>.None, FSharpOption<LegacyReferenceResolver>.None,
+            FSharpOption<FSharpFunc<Tuple<string, DateTime>, FSharpOption<Tuple<object, IntPtr, int>>>>.None,
+            FSharpOption<bool>.None, FSharpOption<bool>.None, FSharpOption<bool>.None, FSharpOption<bool>.None);
 
         private readonly Assembly _assembly;
 
@@ -83,7 +86,7 @@ namespace FSharpSL
 
                 return new FSharpAssembly(result.Item3.Value);
             }
-            catch(TaskCanceledException ex)
+            catch (TaskCanceledException ex)
             {
 #if NETSTANDARD2_0
                 throw;
@@ -110,7 +113,7 @@ namespace FSharpSL
             return await CreateAsync(builder, CancellationToken.None).ConfigureAwait(false);
         }
 
-        private static void ThrowErrorMessages(string path, IEnumerable<FSharpErrorInfo> errors)
+        private static void ThrowErrorMessages(string path, IEnumerable<FSharpDiagnostic> errors)
         {
             int numberOfErrors = 0;
             int numberOfWarnings = 0;
@@ -176,14 +179,14 @@ namespace FSharpSL
         {
             var t = _assembly.GetType(AssemblyName, false, true);
 
-            if(t == null)
+            if (t == null)
             {
                 throw new TypeLoadException($"{AssemblyName} assembly not found.");
             }
 
             var method = t.GetMethod(methodName);
 
-            if(method == null)
+            if (method == null)
             {
                 throw new TypeLoadException($"{methodName} method not found.");
             }
@@ -193,12 +196,12 @@ namespace FSharpSL
                 throw new InvalidOperationException($"{AssemblyName}, {methodName}: cannot create a delegate instance of a non-static method (MethodBase.IsStatic={method.IsStatic.ToString()}).");
             }
 
-            if(method.IsSpecialName)
+            if (method.IsSpecialName)
             {
                 throw new InvalidOperationException($"{AssemblyName}, {methodName}: cannot use a method with a special name (MethodBase.IsSpecialName={method.IsSpecialName.ToString()}).");
             }
 
-            if(method.IsPrivate)
+            if (method.IsPrivate)
             {
                 throw new InvalidOperationException($"{AssemblyName}, {methodName}: cannot use a private method (MethodBase.IsPrivate={method.IsPrivate.ToString()}).");
             }
@@ -224,7 +227,7 @@ namespace FSharpSL
                 var del = (T)method.CreateDelegate(typeof(T));
                 return del;
             }
-            catch(ArgumentException ex)
+            catch (ArgumentException ex)
             {
                 ex.Data.Add(Guid.NewGuid().ToString(), $"{AssemblyName}, {methodName}: failed to create method.");
                 throw;
