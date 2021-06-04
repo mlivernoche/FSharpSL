@@ -90,7 +90,7 @@ namespace FSharpSL
             {
 #if NETSTANDARD2_0
                 throw;
-#elif NET5_0
+#elif NET5_0_OR_GREATER
                 // Workaround for https://github.com/dotnet/fsharp/issues/3219
                 // ex.CancellationToken is not the same as token, for some reason.
                 throw new TaskCanceledException(ex.Message, ex, token);

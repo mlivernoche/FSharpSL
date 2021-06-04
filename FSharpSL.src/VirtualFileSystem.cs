@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -11,7 +10,7 @@ namespace FSharpSL
 {
     internal sealed class VirtualFileSystem : IFileSystem
     {
-        private static readonly IFileSystem Default = new DefaultFileSystem();
+        private static IFileSystem Default { get; } = new DefaultFileSystem();
 
         private HashSet<string> ReferencePaths { get; } = new HashSet<string>();
         private Dictionary<string, byte[]> AllowedFiles { get; } = new Dictionary<string, byte[]>();
@@ -19,46 +18,62 @@ namespace FSharpSL
         private Dictionary<string, string> ImplicitReferencePaths { get; } = new Dictionary<string, string>();
         private HashSet<string> LoadedAssemblies { get; } = new();
 
-        public IReadOnlyDictionary<string, string> GetExplicitlyLoadedReferences() => new ReadOnlyDictionary<string, string>(ExplicitReferencePaths);
+        internal IReadOnlyDictionary<string, string> GetExplicitlyLoadedReferences() => new ReadOnlyDictionary<string, string>(ExplicitReferencePaths);
 
-        public IReadOnlyDictionary<string, string> GetImplicitlyLoadedReferences() => new ReadOnlyDictionary<string, string>(ImplicitReferencePaths);
+        internal IReadOnlyDictionary<string, string> GetImplicitlyLoadedReferences() => new ReadOnlyDictionary<string, string>(ImplicitReferencePaths);
 
         internal VirtualFileSystem(IEnumerable<string> references)
         {
             ReferencePaths = new HashSet<string>(references);
         }
 
-        public void AddFile(string path, byte[] contents)
+        internal VirtualFileSystem(IEnumerable<FSharpScript> scripts)
+        {
+            ReferencePaths = new HashSet<string>(scripts.SelectMany(static x => x.Builder.GetReferences()));
+            AllowedFiles = scripts.ToDictionary(static x => x.Builder.FileName, static x => x.Script);
+        }
+
+        internal void AddFile(string path, byte[] contents)
         {
             AllowedFiles.Add(path, contents);
         }
 
-        public Assembly AssemblyLoad(AssemblyName assemblyName)
+        internal void AddFile(FSharpScript script)
+        {
+            AllowedFiles.Add(script.Builder.FileName, script.Script);
+        }
+
+        Assembly IFileSystem.AssemblyLoad(AssemblyName assemblyName)
         {
             LoadedAssemblies.Add(assemblyName.FullName);
             return Default.AssemblyLoad(assemblyName);
         }
 
-        public Assembly AssemblyLoadFrom(string fileName)
+        Assembly IFileSystem.AssemblyLoadFrom(string fileName)
         {
             throw new NotSupportedException();
         }
 
-        public void FileDelete(string fileName)
+        void IFileSystem.FileDelete(string fileName)
         {
             throw new NotSupportedException();
         }
 
-        public Stream FileStreamCreateShim(string fileName)
+        Stream IFileSystem.FileStreamCreateShim(string fileName)
         {
             throw new NotSupportedException();
         }
 
-        public Stream FileStreamReadShim(string fileName)
+        Stream IFileSystem.FileStreamReadShim(string fileName)
         {
             if (AllowedFiles.TryGetValue(fileName, out var bytes))
             {
                 return new MemoryStream(bytes);
+            }
+
+            if(AllowedFiles.TryGetValue(Path.GetFileName(fileName), out var secondBytes))
+            {
+                return new MemoryStream(secondBytes);
             }
 
             if (!File.Exists(fileName))
@@ -94,46 +109,50 @@ namespace FSharpSL
             throw new NotSupportedException();
         }
 
-        public Stream FileStreamWriteExistingShim(string fileName)
+        Stream IFileSystem.FileStreamWriteExistingShim(string fileName)
         {
             throw new NotSupportedException();
         }
 
-        public string GetFullPathShim(string fileName)
+        string IFileSystem.GetFullPathShim(string fileName)
         {
             return Default.GetFullPathShim(fileName);
         }
 
-        public DateTime GetLastWriteTimeShim(string fileName)
+        DateTime IFileSystem.GetLastWriteTimeShim(string fileName)
         {
             return Default.GetLastWriteTimeShim(fileName);
         }
 
-        public string GetTempPathShim()
+        string IFileSystem.GetTempPathShim()
         {
             return Default.GetTempPathShim();
         }
 
-        public bool IsInvalidPathShim(string filename)
+        bool IFileSystem.IsInvalidPathShim(string filename)
         {
             return Default.IsInvalidPathShim(filename);
         }
 
-        public bool IsPathRootedShim(string path)
+        bool IFileSystem.IsPathRootedShim(string path)
         {
             return Default.IsPathRootedShim(path);
         }
 
-        public bool IsStableFileHeuristic(string fileName)
+        bool IFileSystem.IsStableFileHeuristic(string fileName)
         {
             return Default.IsStableFileHeuristic(fileName);
         }
 
-        public byte[] ReadAllBytesShim(string fileName)
+        byte[] IFileSystem.ReadAllBytesShim(string fileName)
         {
             if (AllowedFiles.TryGetValue(fileName, out var bytes) && bytes != null)
             {
                 return bytes;
+            }
+            else if (AllowedFiles.TryGetValue(Path.GetFileName(fileName), out var secondBytes))
+            {
+                return secondBytes;
             }
             else if (ReferencePaths.Contains(fileName))
             {
@@ -143,8 +162,17 @@ namespace FSharpSL
             throw new NotSupportedException();
         }
 
-        public bool SafeExists(string fileName)
+        bool IFileSystem.SafeExists(string fileName)
         {
+            if (AllowedFiles.ContainsKey(fileName))
+            {
+                return true;
+            }
+            else if (AllowedFiles.ContainsKey(Path.GetFileName(fileName)))
+            {
+                return true;
+            }
+
             return Default.SafeExists(fileName);
         }
     }

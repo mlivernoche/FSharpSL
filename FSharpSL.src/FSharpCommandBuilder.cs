@@ -35,7 +35,7 @@ namespace FSharpSL
 #if NETSTANDARD2_0
                 ReadOnlySpan<char> rSpan = "-r:".AsSpan();
                 ReadOnlySpan<char> referenceSpan = "--reference".AsSpan();
-#elif NET5_0
+#elif NET5_0_OR_GREATER
                 var rSpan = "-r:";
                 var referenceSpan = "--reference";
 #endif

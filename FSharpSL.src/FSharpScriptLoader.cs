@@ -24,6 +24,12 @@ namespace FSharpSL
             FileSystem = new VirtualFileSystem(CompilerOptions.SelectMany(static x => new HashSet<string>(x.GetReferences())));
         }
 
+        protected FSharpScriptLoader(IEnumerable<FSharpScript> scripts)
+        {
+            CompilerOptions = new HashSet<FSharpCompilerOptionsBuilder>(scripts.Select(static x => x.Builder));
+            FileSystem = new VirtualFileSystem(scripts);
+        }
+
         protected void AddFile(string path)
         {
             FileSystem.AddFile(path, Load(path));
@@ -46,7 +52,7 @@ namespace FSharpSL
             using var ms = new MemoryStream();
             await file.CopyToAsync(ms, 81920, token).ConfigureAwait(false);
             return ms.ToArray();
-#elif NET5_0
+#elif NET5_0_OR_GREATER
             return await File.ReadAllBytesAsync(filePath, token).ConfigureAwait(false);
 #endif
         }
@@ -81,10 +87,7 @@ namespace FSharpSL
                     mainRefs.ContainsKey(full) ||
                     callingRefs.ContainsKey(full);
 
-                // this is what .NET needs to run.
-                var isCorelib = asm.Name == "System.Private.CoreLib";
-
-                var okAssembly = isExplicitlyRefed || isImplicitlyRefed || isBuiltRef || isCorelib;
+                var okAssembly = isExplicitlyRefed || isImplicitlyRefed || isBuiltRef;
 
                 if (!okAssembly)
                 {
@@ -93,7 +96,6 @@ namespace FSharpSL
                     sb.AppendLine($"isExplicitlyRefed = {isExplicitlyRefed.ToString()}");
                     sb.AppendLine($"isImplicitlyRefed = {isImplicitlyRefed.ToString()}");
                     sb.AppendLine($"isBuiltRef = {isBuiltRef.ToString()}");
-                    sb.AppendLine($"isCorelib = {isCorelib.ToString()}");
                     sb.AppendLine($"okAssembly = {okAssembly.ToString()}");
                     sb.AppendLine();
 
