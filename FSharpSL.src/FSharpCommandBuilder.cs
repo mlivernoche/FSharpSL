@@ -32,13 +32,8 @@ namespace FSharpSL
                 Commands.Add(command);
 
                 var span = command.AsSpan();
-#if NETSTANDARD2_0
                 ReadOnlySpan<char> rSpan = "-r:".AsSpan();
                 ReadOnlySpan<char> referenceSpan = "--reference".AsSpan();
-#elif NET5_0_OR_GREATER
-                var rSpan = "-r:";
-                var referenceSpan = "--reference";
-#endif
 
                 if (span.StartsWith(rSpan))
                 {

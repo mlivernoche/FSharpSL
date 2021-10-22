@@ -1,4 +1,4 @@
-﻿using FSharp.Compiler.SourceCodeServices;
+﻿using FSharp.Compiler.IO;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -30,7 +30,7 @@ namespace FSharpSL
         internal VirtualFileSystem(IEnumerable<FSharpScript> scripts)
         {
             ReferencePaths = new HashSet<string>(scripts.SelectMany(static x => x.Builder.GetReferences()));
-            AllowedFiles = scripts.ToDictionary(static x => x.Builder.FileName, static x => x.Script);
+            AllowedFiles = scripts.ToDictionary(static x => x.Builder.FileName, static x => x.Script.ToArray());
         }
 
         internal void AddFile(string path, byte[] contents)
@@ -40,7 +40,7 @@ namespace FSharpSL
 
         internal void AddFile(FSharpScript script)
         {
-            AllowedFiles.Add(script.Builder.FileName, script.Script);
+            AllowedFiles.Add(script.Builder.FileName, script.Script.ToArray());
         }
 
         Assembly IFileSystem.AssemblyLoad(AssemblyName assemblyName)

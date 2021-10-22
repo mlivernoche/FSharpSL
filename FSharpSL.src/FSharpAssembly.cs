@@ -1,14 +1,12 @@
-﻿using FSharp.Compiler;
-using FSharp.Compiler.SourceCodeServices;
+﻿using FSharp.Compiler.CodeAnalysis;
+using FSharp.Compiler.Diagnostics;
 using Microsoft.FSharp.Control;
 using Microsoft.FSharp.Core;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -88,12 +86,12 @@ namespace FSharpSL
             }
             catch (TaskCanceledException ex)
             {
-#if NETSTANDARD2_0
-                throw;
-#elif NET5_0_OR_GREATER
+#if NET5_0_OR_GREATER
                 // Workaround for https://github.com/dotnet/fsharp/issues/3219
                 // ex.CancellationToken is not the same as token, for some reason.
                 throw new TaskCanceledException(ex.Message, ex, token);
+#else
+                throw;
 #endif
             }
         }

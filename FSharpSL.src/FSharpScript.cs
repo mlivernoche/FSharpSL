@@ -4,5 +4,5 @@ using System.Text;
 
 namespace FSharpSL
 {
-    internal sealed record FSharpScript(FSharpCompilerOptionsBuilder Builder, byte[] Script);
+    internal sealed record FSharpScript(FSharpCompilerOptionsBuilder Builder, ReadOnlyMemory<byte> Script);
 }

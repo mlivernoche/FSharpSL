@@ -1,19 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net5.0;netstandard2.0</TargetFrameworks>
-    <LangVersion>9.0</LangVersion>
+    <TargetFrameworks>net5.0;netstandard2.0;netstandard2.1;net6.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.Compiler.Service" Version="39.0.0" />
-    <PackageReference Include="IsExternalInit" Version="1.0.0">
+    <PackageReference Include="FSharp.Compiler.Service" Version="40.0.0" />
+    <PackageReference Include="IsExternalInit" Version="1.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="System.Memory" Version="4.5.4" />
   </ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)'=='netstandard2.0' Or '$(TargetFramework)'=='netstandard2.1'">
+		<PackageReference Include="System.Memory" Version="4.5.4" />
+	</ItemGroup>
 
   <Import Project="..\FSharpSL.src\FSharpSL.src.projitems" Label="Shared" />
 

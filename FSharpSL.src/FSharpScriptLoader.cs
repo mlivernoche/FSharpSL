@@ -1,5 +1,4 @@
-﻿using FSharp.Compiler.AbstractIL.Internal;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -47,13 +46,13 @@ namespace FSharpSL
 
         public virtual async Task<byte[]> LoadAsync(string filePath, CancellationToken token = default)
         {
-#if NETSTANDARD2_0
+#if NET5_0_OR_GREATER
+            return await File.ReadAllBytesAsync(filePath, token).ConfigureAwait(false);
+#else
             using var file = File.OpenRead(filePath);
             using var ms = new MemoryStream();
             await file.CopyToAsync(ms, 81920, token).ConfigureAwait(false);
             return ms.ToArray();
-#elif NET5_0_OR_GREATER
-            return await File.ReadAllBytesAsync(filePath, token).ConfigureAwait(false);
 #endif
         }
 
