@@ -46,7 +46,7 @@ namespace FSharpSL
 
         public virtual async Task<byte[]> LoadAsync(string filePath, CancellationToken token = default)
         {
-#if NET5_0_OR_GREATER
+#if NETCOREAPP2_0_OR_GREATER || NETSTANDARD2_1_OR_GREATER
             return await File.ReadAllBytesAsync(filePath, token).ConfigureAwait(false);
 #else
             using var file = File.OpenRead(filePath);

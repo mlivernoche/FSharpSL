@@ -60,11 +60,7 @@ namespace FSharpSL
         {
         }
 
-        internal FSharpAssembly(FSharpCompilerOptionsBuilder builder, IEnumerable<string> references) : this(builder, DefaultChecker)
-        {
-        }
-
-        internal static async Task<FSharpAssembly> CreateAsync(FSharpCompilerOptionsBuilder builder, FSharpChecker checker, CancellationToken token)
+        internal static async Task<FSharpAssembly> CreateAsync(FSharpCompilerOptionsBuilder builder, FSharpChecker checker, CancellationToken token = default)
         {
             try
             {
